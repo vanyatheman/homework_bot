@@ -1,18 +1,15 @@
 import logging
 import os
-import time
 import sys
+import time
 from http import HTTPStatus
 from logging.handlers import RotatingFileHandler
 
 import requests
-
+from dotenv import load_dotenv
 from telegram import Bot
 
-from dotenv import load_dotenv
-
 from exceptions import APIResponseException
-
 
 load_dotenv()
 
@@ -82,7 +79,7 @@ def get_api_answer(timestamp):
     request_params = {
         'url': ENDPOINT,
         'headers': HEADERS,
-        'params': {'from_date': timestamp}
+        'params': {'from_date': timestamp},
     }
     try:
         response = requests.get(**request_params)
@@ -94,19 +91,19 @@ def get_api_answer(timestamp):
             )
             if response.get('code'):
                 if response.get('message'):
-                    error = response.get('message')
+                    error = response['message']
                     logger.error(
-                        f'Ошбика при получении правильного ответа от API: {error}'
+                        f'Ошибка в ответе от API: {error}'
                     )
                     raise APIResponseException(
-                        f'Ошбика при получении правильного ответа от API: {error}'
+                        f'Ошибка в ответе от API: {error}'
                     )
-                error = response.get('error').get('error')
+                error = response['error']['error']
                 logger.error(
-                    f'Ошбика при получении правильного ответа от API: {error}'
+                    f'Ошибка в ответе от API: {error}'
                 )
                 raise APIResponseException(
-                    f'Ошбика при получении правильного ответа от API: {error}'
+                    f'Ошибка в ответе от API: {error}'
                 )
         return response.json()
     except requests.exceptions.RequestException as error:
