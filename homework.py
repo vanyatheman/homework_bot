@@ -10,28 +10,16 @@ from dotenv import load_dotenv
 from telegram import Bot
 
 from exceptions import APIResponseException
+from settings import *
 
 load_dotenv()
 
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-TELEGRAM_CHAT_ID = 97884323
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-RETRY_PERIOD = 600
-ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
-
-
-HOMEWORK_VERDICTS = {
-    'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
-    'reviewing': 'Работа взята на проверку ревьюером.',
-    'rejected': 'Работа проверена: у ревьюера есть замечания.'
-}
-
-ALL_HOMEWORKS = 0
-LAST_HOMEWORK = 0
-
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -82,33 +70,33 @@ def get_api_answer(timestamp):
         'params': {'from_date': timestamp},
     }
     try:
-        response = requests.get(**request_params)
-        if response.status_code == HTTPStatus.OK.value:
+        response = requests.get(**request_params)        
+    except requests.exceptions.RequestException as error:
+        logger.error(f'Ошибка при подключении к API: {error}')
+        raise ConnectionError(f'Ошибка при подключении к API: {error}')
+    if response.status_code == HTTPStatus.OK.value:
             logger.info('Эндпоинт доступен')
-        else:
-            logger.warning(
-                f'API вернул код ошибки: {response.status_code}'
-            )
-            if response.get('code'):
-                if response.get('message'):
-                    error = response['message']
-                    logger.error(
-                        f'Ошибка в ответе от API: {error}'
-                    )
-                    raise APIResponseException(
-                        f'Ошибка в ответе от API: {error}'
-                    )
-                error = response['error']['error']
+    else:
+        logger.warning(
+            f'API вернул код ошибки: {response.status_code}'
+        )
+        if response.get('code'):
+            if response.get('message'):
+                error = response['message']
                 logger.error(
                     f'Ошибка в ответе от API: {error}'
                 )
                 raise APIResponseException(
                     f'Ошибка в ответе от API: {error}'
                 )
-        return response.json()
-    except requests.exceptions.RequestException as error:
-        logger.error(f'Ошибка при подключении к API: {error}')
-        raise ConnectionError(f'Ошибка при подключении к API: {error}')
+            error = response['error']['error']
+            logger.error(
+                f'Ошибка в ответе от API: {error}'
+            )
+            raise APIResponseException(
+                f'Ошибка в ответе от API: {error}'
+            )
+    return response.json()
 
 
 def check_response(response):
@@ -116,12 +104,12 @@ def check_response(response):
     if not isinstance(response, dict):
         raise TypeError('"response" не является словарём')
     if not response.get('homeworks'):
-        raise KeyError(
-            'Не найден ключ "homeworks"'
-        )
+        raise KeyError('Не найден ключ "homeworks"')
     if not isinstance(response.get('homeworks'), list):
         raise TypeError('Ключ "homewokrs" не явлется списком')
-    return response.get('homeworks')[0]
+    if len(response.get('homeworks')) == 0:
+        raise APIResponseException('Список "homeworks" пустой')
+    return response.get('homeworks')[LAST_HOMEWORK]
 
 
 def parse_status(homework):
@@ -129,6 +117,8 @@ def parse_status(homework):
     if not homework.get('homework_name'):
         raise KeyError('Нет ключа "homework_name"')
     homework_name = homework['homework_name']
+    if not homework.get('status'):
+        raise KeyError('Нет ключа "status"')
     status = homework['status']
     if status not in HOMEWORK_VERDICTS:
         logger.error(f'Статус {status} не найден')
