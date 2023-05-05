@@ -10,7 +10,13 @@ from dotenv import load_dotenv
 from telegram import Bot
 
 from exceptions import APIResponseException
-from settings import *
+from settings import (
+    RETRY_PERIOD,
+    ENDPOINT,
+    HOMEWORK_VERDICTS,
+    ALL_HOMEWORKS, LAST_HOMEWORK
+)
+
 
 load_dotenv()
 
@@ -70,12 +76,12 @@ def get_api_answer(timestamp):
         'params': {'from_date': timestamp},
     }
     try:
-        response = requests.get(**request_params)        
+        response = requests.get(**request_params)
     except requests.exceptions.RequestException as error:
         logger.error(f'Ошибка при подключении к API: {error}')
         raise ConnectionError(f'Ошибка при подключении к API: {error}')
     if response.status_code == HTTPStatus.OK.value:
-            logger.info('Эндпоинт доступен')
+        logger.info('Эндпоинт доступен')
     else:
         logger.warning(
             f'API вернул код ошибки: {response.status_code}'
